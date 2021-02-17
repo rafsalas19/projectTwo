@@ -5,34 +5,41 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
+#include <stdbool.h> 
 #define VECTOR_SIZE 100
 
 int pathVectorSize= VECTOR_SIZE;
+int tokenVectorSize= VECTOR_SIZE;
 char **pathVector;
+char **tokenVector;
 char curDir[]="~/";
+int currentPathIndex =0;
+int currentTokIndex =0;
 
-int currentIndex =0;
-//int *pathSizeVector;
+int clearVector(char** vector, int *index){
+	// for(int i =0;i<(*index);++i){
+		// free(vector[i]);
+		
+	// }
+	*index =0;
+	return 0;
+}
 
-
-
-
-int resizedVector(){
-	char** temp = (char**)malloc(sizeof(char*)*2*pathVectorSize);
-	//int* tempSize= (int*)malloc(sizeof(int)*2*pathVectorSize);
+int resizedVector(char ** vector,int *size){
+	char** newVec = (char**)malloc(sizeof(char*)*2*(*size));
 	
-	if (temp ==NULL ){
-		fprintf(stderr, "Failed to resize pathVector array.\n");
+	
+	if (newVec ==NULL ){
+		fprintf(stderr, "Failed to resize Vector array.\n");
 		exit(1);
 	}
-	memcpy(temp, pathVector, pathVectorSize*sizeof(char**));
-	//memcpy(tempSize, pathSizeVector, pathVectorSize*sizeof(int*));
-	pathVectorSize=2*pathVectorSize;
-	pathVector =temp;
-	//pathSizeVector = tempSize;
-	//tempSize=NULL;
-	temp=NULL;
+	memcpy(newVec, vector, (*size)*sizeof(char**));
+	
+	*size=2*(*size);
+	char** swap= vector;
+	vector =newVec;
+	free(swap);
+	
 	return 0;
 }
 
@@ -42,7 +49,7 @@ int isBuiltIn(char* command,int length){return 0;}
 char* checkAccess(char* command,int length){
 	int ret = access(command, X_OK);
 	if (ret==0) {return 0;}
-	for(int i=0;i<currentIndex;++i){
+	for(int i=0;i<currentPathIndex;++i){
 		int size =  strlen(command)+strlen(pathVector[i])+1;
 		char* fullpath = (char*)malloc(sizeof(char)*size);
 		//char slash ='/';
@@ -58,23 +65,70 @@ char* checkAccess(char* command,int length){
 	return NULL;
 }
 
-void parseAndExecute(char* cmdLine){
-	
-	
-	char * token;
-	while( ( token= strtok(cmdLine," ")) != NULL ){
-        //printf("%s\n",token);
-		
-		if(strcmp(cmdLine,"exit") ==0 ||strcmp(cmdLine,"exit\n") ==0){
-			printf("\n");
-			exit(0);
-		}	
-		
+
+int execute(){
+	//check built insline
+	if(strcmp(tokenVector[0],"exit") ==0 ){//||strcmp(tokenVector[0],"exit\n") ==0){
+		printf("\n");
+		exit(0);
+	}
+	else if(strcmp(tokenVector[0],"cd") ==0){
+		if(currentTokIndex!=2){
+			fprintf(stderr, "cd should take one argument.\n");
+			exit(1);
+		}
+		//change dir
+	}
+	else if(strcmp(tokenVector[0],"path") ==0){
+		clearVector(pathVector,&currentPathIndex);
+		int i= 0;
+		for( i=1;i<currentTokIndex;++i){
+			pathVector[i-1]= tokenVector[i];
+			currentPathIndex++;
+		}
+
+		// printf("\nNew Path: ");
+		// for(int i=0;i<currentPathIndex;++i){
+			
+			// printf("%s ",pathVector[i]);
+		// }
+		// printf("\n");
+	}
+	else if(strcmp(tokenVector[0],"\n") ==0){
+		return 0;
 	}
 	
-	
+	return 0;
+}
 
+
+void parseAndExecute(char* cmdLine){
+		
+	char * token;
+	while( ( token= strsep(&cmdLine," ")) != NULL ){
+       // printf("%s\n",token);
+	   if(token==NULL){break;}
+		if(currentTokIndex-1 == tokenVectorSize){
+			resizedVector(tokenVector,&tokenVectorSize);
+		}
+		//take care of \n
+		int tokenSize = strlen(token);
+		if(token[tokenSize-1]=='\n' &&tokenSize>1){
+			token[tokenSize-1] = '\0';
+			
+		}
+		tokenVector[currentTokIndex] = token;
+		currentTokIndex++;	
+
+	}
 	
+	for(int i =0;i<currentTokIndex;i++){
+		printf("%s",tokenVector[i]);		
+	}
+	if(currentTokIndex>=1){
+		execute();
+	}
+	clearVector(tokenVector,&currentTokIndex);
 }
 
 
@@ -84,6 +138,7 @@ int main(int argc, char*argv[]){
 	size_t length=0; 
 	
 	pathVector = (char**)malloc(sizeof(char*)*pathVectorSize);
+	tokenVector = (char**)malloc(sizeof(char*)*tokenVectorSize);
 	//pathSizeVector = (int*)malloc(sizeof(int)*pathVectorSize);
 	
 
