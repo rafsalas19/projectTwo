@@ -5,7 +5,8 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <stdbool.h> 
+#include <stdbool.h>
+#include <sys/wait.h> 
 #define VECTOR_SIZE 100
 
 int pathVectorSize= VECTOR_SIZE;
@@ -15,6 +16,12 @@ char **tokenVector;
 char curDir[]="~/";
 int currentPathIndex =0;
 int currentTokIndex =0;
+
+int error(){
+	char error_message[30] = "An error has occurred\n";
+	write(STDERR_FILENO, error_message, strlen(error_message));
+	return 0;
+}
 
 int clearVector(char** vector, int *index){
 	// for(int i =0;i<(*index);++i){
@@ -30,8 +37,7 @@ int resizedVector(char ** vector,int *size){
 	
 	
 	if (newVec ==NULL ){
-		fprintf(stderr, "Failed to resize Vector array.\n");
-		exit(1);
+		return -1;
 	}
 	memcpy(newVec, vector, (*size)*sizeof(char**));
 	
@@ -44,9 +50,7 @@ int resizedVector(char ** vector,int *size){
 }
 
 
-int isBuiltIn(char* command,int length){return 0;}
-
-char* checkAccess(char* command,int length){
+char* checkAccess(char* command){
 	int ret = access(command, X_OK);
 	if (ret==0) {return 0;}
 	for(int i=0;i<currentPathIndex;++i){
@@ -60,24 +64,56 @@ char* checkAccess(char* command,int length){
 		memcpy(fullpath+strlen(pathVector[i])+1, command , strlen(command)*sizeof(char));
 		
 		ret = access(fullpath, X_OK);
-		if (ret==0) {return 0;}
+		if (ret==0) {return fullpath;}
 	}
 	return NULL;
 }
 
 
+int redirect(char* fname, char* buffer){
+	FILE *outputf = fopen(fname,"w");
+	if(outputf==NULL){
+		return -1;
+	}
+	fputs(buffer,outputf);
+	fclose(outputf);
+	return 0;
+}
+
+int execSingleCmd(char* command,char **args){
+	command=checkAccess(command);
+	if(command==NULL){
+		return -1;
+	}
+	int pid = fork();
+	if(pid==0){
+		//child
+		execv(command, args);
+	}
+		return 0;
+}
+
 int execute(){
 	//check built insline
 	if(strcmp(tokenVector[0],"exit") ==0 ){//||strcmp(tokenVector[0],"exit\n") ==0){
 		printf("\n");
+		if(currentTokIndex>1){
+			error();
+			return-1;
+		}
 		exit(0);
 	}
 	else if(strcmp(tokenVector[0],"cd") ==0){
 		if(currentTokIndex!=2){
-			fprintf(stderr, "cd should take one argument.\n");
-			exit(1);
+			error();
+			return-1;
 		}
 		//change dir
+		if (chdir(tokenVector[1]) != 0){
+			error();
+			return-1;
+		} 
+		return 0;
 	}
 	else if(strcmp(tokenVector[0],"path") ==0){
 		clearVector(pathVector,&currentPathIndex);
@@ -93,11 +129,25 @@ int execute(){
 			// printf("%s ",pathVector[i]);
 		// }
 		// printf("\n");
+		return 0;
 	}
 	else if(strcmp(tokenVector[0],"\n") ==0){
 		return 0;
 	}
+	//printf("here\n");
+	//not built include
+	char* arguments[]={"-l", "./",NULL};
+	char* command="ls";
 	
+	if(execSingleCmd(command,arguments)<0){
+		error();
+		return -1;
+	}
+	int status;
+	while (wait(&status) >=0)
+    {
+		//printf("wait");
+    }
 	return 0;
 }
 
@@ -109,7 +159,11 @@ void parseAndExecute(char* cmdLine){
        // printf("%s\n",token);
 	   if(token==NULL){break;}
 		if(currentTokIndex-1 == tokenVectorSize){
-			resizedVector(tokenVector,&tokenVectorSize);
+			if(resizedVector(tokenVector,&tokenVectorSize)<0){ 
+				error();
+				clearVector(tokenVector,&currentTokIndex);
+				return;
+			}
 		}
 		//take care of \n
 		int tokenSize = strlen(token);
@@ -122,9 +176,9 @@ void parseAndExecute(char* cmdLine){
 
 	}
 	
-	for(int i =0;i<currentTokIndex;i++){
-		printf("%s",tokenVector[i]);		
-	}
+	// for(int i =0;i<currentTokIndex;i++){
+		// printf("%s",tokenVector[i]);		
+	// }
 	if(currentTokIndex>=1){
 		execute();
 	}
