@@ -52,19 +52,17 @@ int resizedVector(char ** vector,int *size){
 
 char* checkAccess(char* command){
 	int ret = access(command, X_OK);
-	printf("check %s %d\n",command,ret);
+	//printf("check %s %d\n",command,ret);
 	if (ret==0) {return command;}
+	
+	
 	for(int i=0;i<currentPathIndex;++i){
 		int size =  strlen(command)+strlen(pathVector[i])+1;
 		char* fullpath = (char*)malloc(sizeof(char)*size);
-		//char slash ='/';
-		printf("check path %s\n",pathVector[i] );
 		memcpy(fullpath,pathVector[i] , strlen(pathVector[i])*sizeof(char));
 		fullpath[strlen(pathVector[i])]='/';
-		
-		//memcpy(fullpath+pathSizeVector*sizeof(char),&slash , sizeof(char));
 		memcpy(fullpath+strlen(pathVector[i])+1, command , strlen(command)*sizeof(char));
-		printf("check %s\n",fullpath);
+		printf("fulle %s\n",fullpath);
 		ret = access(fullpath, X_OK);
 		if (ret==0) {return fullpath;}
 	}
@@ -86,13 +84,14 @@ int checkForRedirect(char* command,char **args){return 0;}
 
 int execSingleCmd(char* command,char **args){
 	command=checkAccess(command);
-	printf("exec %s\n",command);
+	//printf("exec %s\n",command);
 	if(command==NULL){
 		return -1;
 	}
 	int pid = fork();
 	if(pid==0){
 		//child
+		args[0] =command;
 		execv(command, args);
 	}
 		return 0;
@@ -129,13 +128,6 @@ int execute(){
 			pathVector[i-1]= tokenVector[i];
 			currentPathIndex++;
 		}
-
-		// printf("\nNew Path: ");
-		for(int i=0;i<currentPathIndex;++i){
-			
-			printf("%s ",pathVector[i]);
-		}
-		// printf("\n");
 		return 0;
 	}
 	else if(strcmp(tokenVector[0],"\n") ==0){
@@ -147,6 +139,7 @@ int execute(){
 	// char* arguments[]={"-l", "./",NULL};
 	// char* command="ls";
 	int tokIter=0; //helps iterate for command and argument
+
 	while(tokIter<currentTokIndex){
 		if(strcmp(tokenVector[tokIter],"&")==0){
 			tokIter++;
@@ -155,21 +148,24 @@ int execute(){
 
 		char *command=tokenVector[tokIter];
 		tokIter++;
-		char** arguments = (char**)malloc(sizeof(char*)*currentTokIndex);
-		// arguments[0]= "-l";
-		// arguments[1]="./";
-		// arguments[2]=NULL;
-		for(int i=0;i<currentTokIndex-1;++i){
-			arguments[i]=tokenVector[tokIter];
-			printf("arg %s\n", arguments[i]);
+		char** arguments = (char**)malloc(sizeof(char*)*(currentTokIndex+1));
+
+	
+		for(int i=1;i<currentTokIndex;++i){
+			if(strcmp(tokenVector[tokIter],"&")==0){			
+				arguments[i]=NULL;
+				break;
+			}
+			arguments[i]=tokenVector[tokIter];			
 			tokIter++;
+
 			if(i==currentTokIndex-2){//set last element to NULL
 				arguments[i+1]=NULL;
-				printf("arg %s\n", arguments[i+1]);
+			//	printf("arg %s\n", arguments[i+1]);
 			}
 		}
 		
-		printf("command %s\n", command);
+		//printf("command %s\n", command);
 		// for(int i=0;i<=tokIter-1;++i){
 			// printf("arg %s\n", arguments[i]);
 		// }
@@ -191,7 +187,6 @@ int execute(){
 
 
 void parseAndExecute(char* cmdLine){
-		
 	char * token;
 	while( ( token= strsep(&cmdLine," ")) != NULL ){
        // printf("%s\n",token);
@@ -209,14 +204,15 @@ void parseAndExecute(char* cmdLine){
 			token[tokenSize-1] = '\0';
 			
 		}
-		tokenVector[currentTokIndex] = token;
+		
+		char * pushToken= (char*)malloc(sizeof(char)*strlen(token));
+		*pushToken = *token;
+		memcpy(pushToken,token , strlen(token)*sizeof(char));
+		tokenVector[currentTokIndex] = pushToken;
 		currentTokIndex++;	
 
 	}
-	
-	// for(int i =0;i<currentTokIndex;i++){
-		// printf("%s",tokenVector[i]);		
-	// }
+
 	if(currentTokIndex>=1){
 		execute();
 	}
