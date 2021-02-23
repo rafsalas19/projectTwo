@@ -4,9 +4,11 @@
 #include <assert.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <sys/wait.h> 
+
 #define VECTOR_SIZE 100
 
 int pathVectorSize= VECTOR_SIZE;
@@ -62,7 +64,7 @@ char* checkAccess(char* command){
 		memcpy(fullpath,pathVector[i] , strlen(pathVector[i])*sizeof(char));
 		fullpath[strlen(pathVector[i])]='/';
 		memcpy(fullpath+strlen(pathVector[i])+1, command , strlen(command)*sizeof(char));
-		printf("fulle %s\n",fullpath);
+		//printf("fulle %s\n",fullpath);
 		ret = access(fullpath, X_OK);
 		if (ret==0) {return fullpath;}
 	}
@@ -70,19 +72,7 @@ char* checkAccess(char* command){
 }
 
 
-int redirect(char* fname, char* buffer){
-	FILE *outputf = fopen(fname,"w");
-	if(outputf==NULL){
-		return -1;
-	}
-	fputs(buffer,outputf);
-	fclose(outputf);
-	return 0;
-}
-
-int checkForRedirect(char* command,char **args){return 0;}
-
-int execSingleCmd(char* command,char **args){
+int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 	command=checkAccess(command);
 	//printf("exec %s\n",command);
 	if(command==NULL){
@@ -90,6 +80,18 @@ int execSingleCmd(char* command,char **args){
 	}
 	int pid = fork();
 	if(pid==0){
+		if(redirect == true){
+			
+			if(fname==NULL){
+				return -1;
+			}
+			 int fno = open(fname, O_WRONLY| O_CREAT| O_TRUNC); 
+			 if(fno <0){
+				 return -1;
+			 }
+			 close(1);// close stdout
+			 dup2(fno,1);
+		}
 		//child
 		args[0] =command;
 		execv(command, args);
@@ -141,9 +143,13 @@ int execute(){
 	int tokIter=0; //helps iterate for command and argument
 
 	while(tokIter<currentTokIndex){
-		if(strcmp(tokenVector[tokIter],"&")==0){
-			tokIter++;
-			if(tokIter>=currentTokIndex){ break;}
+		bool redirect =false;
+		char* fname=NULL;
+		if(strcmp(tokenVector[tokIter],"&")==0){//parallel | look for more commands
+			tokIter++;//move on to next command
+			if(tokIter>=currentTokIndex){ break;}//no more commands
+		}else if(strcmp(tokenVector[tokIter],">")==0){//redirect given, this should have been handled by last iteration let break
+			break;
 		}
 
 		char *command=tokenVector[tokIter];
@@ -152,10 +158,19 @@ int execute(){
 
 	
 		for(int i=1;i<currentTokIndex;++i){
-			if(strcmp(tokenVector[tokIter],"&")==0){			
+			if(strcmp(tokenVector[tokIter],"&")==0){//if & finish this command so we can move on to next			
 				arguments[i]=NULL;
 				break;
 			}
+			else if(strcmp(tokenVector[tokIter],">")==0){//redirect to file
+				if(!(tokIter+1 < currentTokIndex)){//no output file name given
+					return -1;
+				}
+				redirect=true;
+				fname = tokenVector[tokIter+1];
+				break;
+			}
+			//default action
 			arguments[i]=tokenVector[tokIter];			
 			tokIter++;
 
@@ -165,11 +180,8 @@ int execute(){
 			}
 		}
 		
-		//printf("command %s\n", command);
-		// for(int i=0;i<=tokIter-1;++i){
-			// printf("arg %s\n", arguments[i]);
-		// }
-		if(execSingleCmd(command,arguments)<0){
+
+		if(execSingleCmd(command,arguments,redirect,fname)<0){
 			error();
 			return -1;
 		}
@@ -216,6 +228,7 @@ void parseAndExecute(char* cmdLine){
 	if(currentTokIndex>=1){
 		execute();
 	}
+	
 	clearVector(tokenVector,&currentTokIndex);
 }
 

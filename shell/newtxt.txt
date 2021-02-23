@@ -1,0 +1,9 @@
+Makefile
+README.md
+my.txt
+newtxt.txt
+test-wish.sh
+tester
+tests
+wish
+wish.c
