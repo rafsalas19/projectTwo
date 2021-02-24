@@ -154,12 +154,16 @@ int execute(){
 
 		char *command=tokenVector[tokIter];
 		tokIter++;
-		char** arguments = (char**)malloc(sizeof(char*)*(currentTokIndex+1));
+		
+		//printf("after Command\n");
+		
+		char** arguments = (char**)malloc(sizeof(char*)*(currentTokIndex+1));//free this later
 
-	
-		for(int i=1;i<currentTokIndex;++i){
+		//printf("after Alloc %d %d\n",currentTokIndex,tokIter);
+		int parseLimit = currentTokIndex - (tokIter -1);
+		for(int i=1;i<parseLimit;++i){
 			if(strcmp(tokenVector[tokIter],"&")==0){//if & finish this command so we can move on to next			
-				arguments[i]=NULL;
+				//arguments[i]=NULL;
 				break;
 			}
 			else if(strcmp(tokenVector[tokIter],">")==0){//redirect to file
@@ -179,8 +183,8 @@ int execute(){
 			//	printf("arg %s\n", arguments[i+1]);
 			}
 		}
+		//printf("about to execute %d %d\n",currentTokIndex,tokIter);
 		
-
 		if(execSingleCmd(command,arguments,redirect,fname)<0){
 			error();
 			return -1;
