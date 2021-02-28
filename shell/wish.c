@@ -208,10 +208,32 @@ int execute(){
 }
 
 
+int preparse(char* cmdLine){
+	int index = 0;
+	while( index < strlen(cmdLine)){
+		index = strcspn(cmdLine, "\t");
+		if(!(index < strlen(cmdLine))){
+			break;
+		}
+		cmdLine[index] = ' ';
+	}
+	index = 0;
+	while( index < strlen(cmdLine)){
+		index = strcspn(cmdLine, "\n");
+		if(!(index < strlen(cmdLine))){
+			break;
+		}
+		cmdLine[index] = '\0';
+	}
+	//printf("%s",cmdLine);
+	return 0;
+}
+
 void parseAndExecute(char* cmdLine){
+	preparse(cmdLine);
 	char * token;
+	
 	while( ( token= strsep(&cmdLine," ")) != NULL ){
-       //printf("%s\n",token);
 	   if(token==NULL){break;}
 		if(currentTokIndex-1 == tokenVectorSize){
 			if(resizedVector(tokenVector,&tokenVectorSize)<0){ 
@@ -262,6 +284,7 @@ int main(int argc, char*argv[]){
 		while(1){
 			printf("wish>");
 			getline(&buffer,&length,stdin);
+			
 			parseAndExecute(buffer);
 		}
 	}
