@@ -13,11 +13,14 @@
 
 int pathVectorSize= VECTOR_SIZE;
 int tokenVectorSize= VECTOR_SIZE;
+//int fileVectorSize= VECTOR_SIZE;
+//char **fileVector;
 char **pathVector;
 char **tokenVector;
 char curDir[]="~/";
 int currentPathIndex =0;
 int currentTokIndex =0;
+//int currentFileIndex =0;
 
 int error(){
 	char error_message[30] = "An error has occurred\n";
@@ -54,17 +57,16 @@ int resizedVector(char ** vector,int *size){
 
 char* checkAccess(char* command){
 	int ret = access(command, X_OK);
-	//printf("check %s %d\n",command,ret);
+
 	if (ret==0) {return command;}
-	
-	
+
 	for(int i=0;i<currentPathIndex;++i){
 		int size =  strlen(command)+strlen(pathVector[i])+1;
 		char* fullpath = (char*)malloc(sizeof(char)*size);
 		memcpy(fullpath,pathVector[i] , strlen(pathVector[i])*sizeof(char));
 		fullpath[strlen(pathVector[i])]='/';
 		memcpy(fullpath+strlen(pathVector[i])+1, command , strlen(command)*sizeof(char));
-		//printf("fulle %s\n",fullpath);
+
 		ret = access(fullpath, X_OK);
 		if (ret==0) {return fullpath;}
 	}
@@ -74,29 +76,30 @@ char* checkAccess(char* command){
 
 int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 	command=checkAccess(command);
-	//printf("exec %s\n",command);
+
 	if(command==NULL){
 		return -1;
 	}
 	int pid = fork();
 	if(pid==0){
 		if(redirect == true){
-			
 			if(fname==NULL){
 				return -1;
 			}
-			 int fno = open(fname, O_WRONLY| O_CREAT| O_TRUNC); 
-			 if(fno <0){
-				 return -1;
-			 }
-			 close(1);// close stdout
-			 dup2(fno,1);
+			FILE *outfile= fopen(fname,"w");
+			//struct stat ofstat;
+			int fno = fileno(outfile);//open(fname, O_TRUNC); //
+			if(fno <0){
+				return -1;
+			}
+			close(1);// close stdout
+			dup2(fno,1);
 		}
 		//child
 		args[0] =command;
 		execv(command, args);
 	}
-		return 0;
+	return 0;
 }
 
 
@@ -127,9 +130,11 @@ int execute(){
 		clearVector(pathVector,&currentPathIndex);
 		int i= 0;
 		for( i=1;i<currentTokIndex;++i){
+
 			pathVector[i-1]= tokenVector[i];
 			currentPathIndex++;
 		}
+
 		return 0;
 	}
 	else if(strcmp(tokenVector[0],"\n") ==0){
@@ -137,9 +142,6 @@ int execute(){
 	}
 
 
-	//char ** commands = (char**)malloc(sizeof(char*)*(currentTokIndex+1));
-	// char* arguments[]={"-l", "./",NULL};
-	// char* command="ls";
 	int tokIter=0; //helps iterate for command and argument
 
 	while(tokIter<currentTokIndex){
@@ -149,25 +151,31 @@ int execute(){
 			tokIter++;//move on to next command
 			if(tokIter>=currentTokIndex){ break;}//no more commands
 		}else if(strcmp(tokenVector[tokIter],">")==0){//redirect given, this should have been handled by last iteration let break
-			break;
+			tokIter++;
+			tokIter++;
+			if(tokIter>=currentTokIndex){
+				break;
+			}else if(strcmp(tokenVector[tokIter],"&")==0){
+				continue;
+			}
+			else{
+				return -1;
+			}			
 		}
 
 		char *command=tokenVector[tokIter];
 		tokIter++;
 		
-		//printf("after Command\n");
-		
 		char** arguments = (char**)malloc(sizeof(char*)*(currentTokIndex+1));//free this later
 
-		//printf("after Alloc %d %d\n",currentTokIndex,tokIter);
 		int parseLimit = currentTokIndex - (tokIter -1);
 		for(int i=1;i<parseLimit;++i){
 			if(strcmp(tokenVector[tokIter],"&")==0){//if & finish this command so we can move on to next			
-				//arguments[i]=NULL;
 				break;
 			}
 			else if(strcmp(tokenVector[tokIter],">")==0){//redirect to file
 				if(!(tokIter+1 < currentTokIndex)){//no output file name given
+					error();
 					return -1;
 				}
 				redirect=true;
@@ -180,10 +188,8 @@ int execute(){
 
 			if(i==currentTokIndex-2){//set last element to NULL
 				arguments[i+1]=NULL;
-			//	printf("arg %s\n", arguments[i+1]);
 			}
 		}
-		//printf("about to execute %d %d\n",currentTokIndex,tokIter);
 		
 		if(execSingleCmd(command,arguments,redirect,fname)<0){
 			error();
@@ -205,7 +211,7 @@ int execute(){
 void parseAndExecute(char* cmdLine){
 	char * token;
 	while( ( token= strsep(&cmdLine," ")) != NULL ){
-       // printf("%s\n",token);
+       //printf("%s\n",token);
 	   if(token==NULL){break;}
 		if(currentTokIndex-1 == tokenVectorSize){
 			if(resizedVector(tokenVector,&tokenVectorSize)<0){ 
@@ -224,13 +230,17 @@ void parseAndExecute(char* cmdLine){
 		char * pushToken= (char*)malloc(sizeof(char)*strlen(token));
 		*pushToken = *token;
 		memcpy(pushToken,token , strlen(token)*sizeof(char));
-		tokenVector[currentTokIndex] = pushToken;
+		tokenVector[currentTokIndex] = pushToken;		
 		currentTokIndex++;	
 
 	}
 
 	if(currentTokIndex>=1){
-		execute();
+		if(execute()<0){
+			error();
+			clearVector(tokenVector,&currentTokIndex);
+			return;
+		}
 	}
 	
 	clearVector(tokenVector,&currentTokIndex);
@@ -244,19 +254,10 @@ int main(int argc, char*argv[]){
 	
 	pathVector = (char**)malloc(sizeof(char*)*pathVectorSize);
 	tokenVector = (char**)malloc(sizeof(char*)*tokenVectorSize);
-	//pathSizeVector = (int*)malloc(sizeof(int)*pathVectorSize);
+	//fileVector = (int*)malloc(sizeof(int)*fileVectorSize);
 	
 
-	// char *tmp = (char*)malloc(sizeof(char)*5);
-	// //print("fst size:%d \n",strlen(tmp));
-	// for(int i=0;i<5;++i){
-		
-		// tmp[i] = 'a';
-	// }
-	// printf("fst size:%ld \n",strlen(tmp));
-	// tmp[4]='\0';
-	// printf("snd size:%ld \n",strlen(tmp));
-	
+
 	if(argc<2){
 		while(1){
 			printf("wish>");
@@ -264,9 +265,24 @@ int main(int argc, char*argv[]){
 			parseAndExecute(buffer);
 		}
 	}
-	
-	
-	
+	else{
+		
+		FILE **inputf = (FILE **)malloc(sizeof(FILE*)*(argc-1));
+
+		for(int i = 0;i<argc-1;++i){
+			inputf[i]= fopen(argv[i+1],"r");//try to open input file	
+			//printf("file: %s\n",argv[i+1]);
+			if(inputf[i]==NULL){
+				error();
+				return -1;
+			}	
+			//getlines
+			while(getline(&buffer,&length,inputf[i])!=-1){
+				parseAndExecute(buffer);
+			}
+			fclose(inputf[i]);
+		}
+	}
 	
 	return 0;
 }
