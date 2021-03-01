@@ -18,7 +18,7 @@ int tokenVectorSize= VECTOR_SIZE;
 char **pathVector;
 char **tokenVector;
 char curDir[]="~/";
-int currentPathIndex =0;
+int currentPathIndex =1;
 int currentTokIndex =0;
 //int currentFileIndex =0;
 
@@ -75,13 +75,15 @@ char* checkAccess(char* command){
 
 
 int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
-	command=checkAccess(command);
+	args[0] =command; 
+	char * fullpath=checkAccess(command);
 
-	if(command==NULL){
+	if(fullpath==NULL){
+
 		return -1;
 	}
 	int pid = fork();
-	if(pid==0){
+	if(pid==0){//child
 		if(redirect == true){
 			if(fname==NULL){
 				return -1;
@@ -95,9 +97,10 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 			close(1);// close stdout
 			dup2(fno,1);
 		}
-		//child
-		args[0] =command;
-		execv(command, args);
+		
+
+		//fullpath
+		execv(fullpath, args);
 	}
 	return 0;
 }
@@ -107,30 +110,37 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 int execute(){
 	//check built insline
 	if(strcmp(tokenVector[0],"exit") ==0 ){//||strcmp(tokenVector[0],"exit\n") ==0){
-		printf("\n");
+		//printf("\n");
 		if(currentTokIndex>1){
-			error();
 			return-1;
 		}
 		exit(0);
 	}
 	else if(strcmp(tokenVector[0],"cd") ==0){
 		if(currentTokIndex!=2){
-			error();
+			//error();
 			return-1;
 		}
 		//change dir
 		if (chdir(tokenVector[1]) != 0){
-			error();
+			//error();
 			return-1;
 		} 
 		return 0;
 	}
 	else if(strcmp(tokenVector[0],"path") ==0){
 		clearVector(pathVector,&currentPathIndex);
+		//currentPathIndex++;
 		int i= 0;
+		
+		//pathVector[0]="/bin";
 		for( i=1;i<currentTokIndex;++i){
-
+			if(currentPathIndex-1 == pathVectorSize){
+				if(resizedVector(pathVector,&pathVectorSize)<0){ 				
+					clearVector(pathVector,&currentPathIndex);
+					return -1;
+				}
+			}
 			pathVector[i-1]= tokenVector[i];
 			currentPathIndex++;
 		}
@@ -150,7 +160,8 @@ int execute(){
 		if(strcmp(tokenVector[tokIter],"&")==0){//parallel | look for more commands
 			tokIter++;//move on to next command
 			if(tokIter>=currentTokIndex){ break;}//no more commands
-		}else if(strcmp(tokenVector[tokIter],">")==0){//redirect given, this should have been handled by last iteration let break
+		}
+		else if(strcmp(tokenVector[tokIter],">")==0){//redirect given, this should have been handled by last iteration let break
 			tokIter++;
 			tokIter++;
 			if(tokIter>=currentTokIndex){
@@ -167,32 +178,40 @@ int execute(){
 		tokIter++;
 		
 		char** arguments = (char**)malloc(sizeof(char*)*(currentTokIndex+1));//free this later
-
-		int parseLimit = currentTokIndex - (tokIter -1);
+		int parseLimit = currentTokIndex - (tokIter -1); //the limit changes with iteration
+		
 		for(int i=1;i<parseLimit;++i){
 			if(strcmp(tokenVector[tokIter],"&")==0){//if & finish this command so we can move on to next			
 				break;
 			}
 			else if(strcmp(tokenVector[tokIter],">")==0){//redirect to file
 				if(!(tokIter+1 < currentTokIndex)){//no output file name given
-					error();
+					//error();
 					return -1;
 				}
 				redirect=true;
+
 				fname = tokenVector[tokIter+1];
+
 				break;
 			}
+
 			//default action
 			arguments[i]=tokenVector[tokIter];			
 			tokIter++;
-
+			
 			if(i==currentTokIndex-2){//set last element to NULL
 				arguments[i+1]=NULL;
+			}
+			else if(tokIter >= currentTokIndex)//hacky but makes sure we are within bounds
+			{
+				arguments[i+1]=NULL;
+				break;
 			}
 		}
 		
 		if(execSingleCmd(command,arguments,redirect,fname)<0){
-			error();
+
 			return -1;
 		}
 	}
@@ -208,9 +227,10 @@ int execute(){
 }
 
 
-int preparse(char* cmdLine){
+char * preparse(char* cmdLine){
 	int index = 0;
-	while( index < strlen(cmdLine)){
+	int length = strlen(cmdLine);
+	while( index < length){
 		index = strcspn(cmdLine, "\t");
 		if(!(index < strlen(cmdLine))){
 			break;
@@ -218,22 +238,43 @@ int preparse(char* cmdLine){
 		cmdLine[index] = ' ';
 	}
 	index = 0;
-	while( index < strlen(cmdLine)){
+	while( index < length){
 		index = strcspn(cmdLine, "\n");
 		if(!(index < strlen(cmdLine))){
 			break;
 		}
 		cmdLine[index] = '\0';
 	}
-	//printf("%s",cmdLine);
-	return 0;
+	
+	char *parseStr= malloc(sizeof(char)* (length+1));
+	bool spaceLastchar = false;
+	int parseIter=0;
+	for(int i =0;i<length;++i){	
+		if((cmdLine[i]==' ') && (spaceLastchar==false)){
+			spaceLastchar = true;
+		}
+		else if((cmdLine[i]==' ') && (spaceLastchar==true)){
+			continue;
+		}
+		else{
+			spaceLastchar =false;
+		}
+		parseStr[parseIter] = cmdLine[i];
+		parseIter++;
+	}
+	parseStr[parseIter] ='\0';
+	//char *tmp = cmdLine;
+	//cmdLine = &parseStr;
+	
+	//printf("%s\n",parseStr);
+	return parseStr;
 }
 
 void parseAndExecute(char* cmdLine){
-	preparse(cmdLine);
+	char* prep= preparse(cmdLine);
 	char * token;
 	
-	while( ( token= strsep(&cmdLine," ")) != NULL ){
+	while( ( token= strsep(&prep," ")) != NULL ){
 	   if(token==NULL){break;}
 		if(currentTokIndex-1 == tokenVectorSize){
 			if(resizedVector(tokenVector,&tokenVectorSize)<0){ 
@@ -278,26 +319,26 @@ int main(int argc, char*argv[]){
 	tokenVector = (char**)malloc(sizeof(char*)*tokenVectorSize);
 	//fileVector = (int*)malloc(sizeof(int)*fileVectorSize);
 	
-
+	pathVector[0]="/bin";
 
 	if(argc<2){
 		while(1){
 			printf("wish>");
 			getline(&buffer,&length,stdin);
-			
+			//preparse(buffer);
 			parseAndExecute(buffer);
 		}
 	}
-	else{
+	else if (argc <3){
 		
-		FILE **inputf = (FILE **)malloc(sizeof(FILE*)*(argc-1));
+		FILE **inputf = (FILE **)malloc(sizeof(FILE*));
 
 		for(int i = 0;i<argc-1;++i){
 			inputf[i]= fopen(argv[i+1],"r");//try to open input file	
 			//printf("file: %s\n",argv[i+1]);
 			if(inputf[i]==NULL){
 				error();
-				return -1;
+				exit(1);
 			}	
 			//getlines
 			while(getline(&buffer,&length,inputf[i])!=-1){
@@ -305,6 +346,10 @@ int main(int argc, char*argv[]){
 			}
 			fclose(inputf[i]);
 		}
+	}
+	else{
+		error();
+		exit(1);
 	}
 	
 	return 0;
