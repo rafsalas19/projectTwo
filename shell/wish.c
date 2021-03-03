@@ -76,7 +76,7 @@ char* checkAccess(char* command){
 
 int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 	args[0] =command;
-	// args[1] =NULL;
+	
 	char * fullpath=checkAccess(command);
 
 	if(fullpath==NULL){
@@ -99,7 +99,7 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 			close(1);// close stdout
 			dup2(fno,1);
 		}
-		printf("child %s %s\n", fullpath, args[0]);
+
 
 		//fullpath
 		int ret = execv(fullpath, args);
@@ -110,15 +110,16 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 	}
 	else{
 		int status;
-		wait(&status);
-		// while (wait(&status) >=0)
-		// {
-			// // //printf("wait");
-		// }
-		if (WIFEXITED(status)) 
-			printf("Exit status: %d\n", WEXITSTATUS(status)); 
-		else if (WIFSIGNALED(status)) 
-			psignal(WTERMSIG(status), "Exit signal");
+		//wait(&status);
+		while (wait(&status) >=0)
+		{
+			
+		}
+		return status;
+		// if (WIFEXITED(status)) 
+			// printf("Exit status: %d\n", WEXITSTATUS(status)); 
+		// else if (WIFSIGNALED(status)) 
+			// psignal(WTERMSIG(status), "Exit signal");
 		//printf("return status %d\n",status);
 	}
 	return 0;
@@ -179,9 +180,7 @@ int execute(){
 		bool redirect =false;
 		char* fname=NULL;
 		if(strcmp(tokenVector[tokIter],"&")==0){//parallel | look for more commands
-			if(tokIter==0){
-				return -1;
-			}
+
 			tokIter++;//move on to next command
 			if(tokIter>=currentTokIndex){ break;}//no more commands
 		}
@@ -236,7 +235,6 @@ int execute(){
 			//default action
 			arguments[i]=tokenVector[tokIter];			
 			tokIter++;
-			printf("arg: %s\n",arguments[i]);
 			if(i==currentTokIndex-2){//set last element to NULL
 				arguments[i+1]=NULL;
 			}
@@ -252,14 +250,6 @@ int execute(){
 			return -1;
 		}
 	}
-	// wait(NULL);
-// wait(NULL);
-	
-	// int status;
-	// while (wait(&status) >=0)
-    // {
-		// //printf("wait");
-    // }
 
 	return 0;
 }
@@ -333,7 +323,7 @@ char * preparse(char* cmdLine){
 	}
 
 	
-	printf("%s\n",parseStr);
+	//printf("%s\n",parseStr);
 	free(tempParse);
 	return parseStr;
 }
