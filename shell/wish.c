@@ -75,7 +75,8 @@ char* checkAccess(char* command){
 
 
 int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
-	args[0] =command; 
+	args[0] =command;
+	// args[1] =NULL;
 	char * fullpath=checkAccess(command);
 
 	if(fullpath==NULL){
@@ -83,24 +84,42 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 		return -1;
 	}
 	int pid = fork();
-	if(pid==0){//child
+	if(pid==0)
+	{//child
 		if(redirect == true){
 			if(fname==NULL){
-				return -1;
+				exit( -1);
 			}
 			FILE *outfile= fopen(fname,"w");
 			//struct stat ofstat;
 			int fno = fileno(outfile);//open(fname, O_TRUNC); //
 			if(fno <0){
-				return -1;
+				exit( -1);
 			}
 			close(1);// close stdout
 			dup2(fno,1);
 		}
-		
+		printf("child %s %s\n", fullpath, args[0]);
 
 		//fullpath
-		execv(fullpath, args);
+		int ret = execv(fullpath, args);
+		// char * tmparg[]= {"ls",NULL};
+		// int ret = execv("/bin/ls", tmparg);
+		exit( ret);
+		
+	}
+	else{
+		int status;
+		wait(&status);
+		// while (wait(&status) >=0)
+		// {
+			// // //printf("wait");
+		// }
+		if (WIFEXITED(status)) 
+			printf("Exit status: %d\n", WEXITSTATUS(status)); 
+		else if (WIFSIGNALED(status)) 
+			psignal(WTERMSIG(status), "Exit signal");
+		//printf("return status %d\n",status);
 	}
 	return 0;
 }
@@ -110,12 +129,11 @@ int execSingleCmd(char* command,char **args, bool redirect,char* fname ){
 int execute(){
 	//check built insline
 	if(strcmp(tokenVector[0],"exit") ==0 ){//||strcmp(tokenVector[0],"exit\n") ==0){
-		printf("exit\n");
 		if(currentTokIndex>1){
 			return-1;
 		}
-			int pid = getpid();
-		printf("my pid1=%d\n",pid);
+			// int pid = getpid();
+		// printf("my pid1=%d\n",pid);
 		exit(0);
 		//printf("exit2\n");
 	}
@@ -193,6 +211,7 @@ int execute(){
 		
 		for(int i=1;i<parseLimit;++i){
 			if(strcmp(tokenVector[tokIter],"&")==0){//if & finish this command so we can move on to next			
+				arguments[i] =NULL;
 				break;
 			}
 			else if(strcmp(tokenVector[tokIter],">")==0){//redirect to file
@@ -217,7 +236,7 @@ int execute(){
 			//default action
 			arguments[i]=tokenVector[tokIter];			
 			tokIter++;
-			
+			printf("arg: %s\n",arguments[i]);
 			if(i==currentTokIndex-2){//set last element to NULL
 				arguments[i+1]=NULL;
 			}
@@ -233,14 +252,15 @@ int execute(){
 			return -1;
 		}
 	}
+	// wait(NULL);
+// wait(NULL);
 	
+	// int status;
+	// while (wait(&status) >=0)
+    // {
+		// //printf("wait");
+    // }
 
-	
-	int status;
-	while (wait(&status) >=0)
-    {
-		//printf("wait");
-    }
 	return 0;
 }
 
@@ -313,7 +333,7 @@ char * preparse(char* cmdLine){
 	}
 
 	
-	//printf("%s\n",parseStr);
+	printf("%s\n",parseStr);
 	free(tempParse);
 	return parseStr;
 }
@@ -390,7 +410,6 @@ int main(int argc, char*argv[]){
 		//getlines
 	
 		while(getline(&buffer,&length,inputf)!=-1){			
-			
 			parseAndExecute(buffer);
 		}
 		fclose(inputf);
