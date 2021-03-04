@@ -211,6 +211,7 @@ int execute(){
 		if(execSingleCmd(command,arguments,redirect,fname)<0){
 			return -1;
 		}
+		
 	}
 	//wait for my children
 	bool badReturn =false;
@@ -224,6 +225,7 @@ int execute(){
 			badReturn =true;
 		}
 	}
+	free(status);
 	if(badReturn){return -1; }
 	return 0;
 }
@@ -314,15 +316,14 @@ void parseAndExecute(char* cmdLine){
 				return;
 			}
 		}
-
-		int tokenSize = strlen(token);
-		// if(token[tokenSize-1]=='\n' &&tokenSize>1){
-			// token[tokenSize-1] = '\0';
-			
-		// }
 		
 		char * pushToken= (char*)malloc(sizeof(char)*strlen(token));
+		if(pushToken == NULL){
+			error();
+			return;
+		}
 		*pushToken = *token;
+		
 		memcpy(pushToken,token , strlen(token)*sizeof(char));
 		tokenVector[currentTokIndex] = pushToken;		
 		currentTokIndex++;	
@@ -382,6 +383,7 @@ int main(int argc, char*argv[]){
 		error();
 		exit(1);
 	}
-	
+	free(pathVector);
+	free(tokenVector);
 	return 0;
 }
