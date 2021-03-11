@@ -151,8 +151,13 @@ int execute(){
 		bool redirect =false;
 		char* fname=NULL;
 		if(strcmp(tokenVector[tokIter],"&")==0){//parallel | look for more commands
-			tokIter++;//move on to next command
-			if(tokIter>=currentTokIndex){ break;}//no more commands
+			while(strcmp(tokenVector[tokIter],"&")==0){
+				tokIter++;//move on to next command
+				if(tokIter>=currentTokIndex){ break;}
+				
+			}
+			// tokIter++;//move on to next command
+			 if(tokIter>=currentTokIndex){ break;}//no more commands
 		}
 		else if(strcmp(tokenVector[tokIter],">")==0){//redirect given, this should have been handled by last iteration let break
 			if(tokIter==0){
@@ -343,13 +348,13 @@ void parseAndExecute(char* cmdLine){
 
 
 int main(int argc, char*argv[]){
-	//int size=0;
+
 	char *buffer;
 	size_t length=0; 
 	
 	pathVector = (char**)malloc(sizeof(char*)*pathVectorSize);
 	tokenVector = (char**)malloc(sizeof(char*)*tokenVectorSize);
-	//fileVector = (int*)malloc(sizeof(int)*fileVectorSize);
+
 	
 	pathVector[0]="/bin";
 
@@ -366,7 +371,7 @@ int main(int argc, char*argv[]){
 		FILE *inputf = (FILE *)malloc(sizeof(FILE));
 
 		inputf= fopen(argv[1],"r");//try to open input file	
-		//printf("file: %s\n",argv[i+1]);
+		
 		if(inputf==NULL){
 			error();
 			exit(1);
